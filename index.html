@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KalkylatorPlusPlus</title>
+  <style>
+    button[type="button"] {
+      width: 2rem;
+      height: 2rem;
+      margin: 0.1rem 0;
+    }
+
+    input[type="text"] {
+      width: calc(100% - 3rem);
+      height: 1.5rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div>
+    <button type="button" id="reset">C</button>
+    <input type="text" id="input" disabled>
+    <hr>
+    <button type="button" id="one">1</button>
+    <button type="button" id="two">2</button>
+    <button type="button" id="three">3</button>
+    <button type="button" id="division">/</button>
+    <br>
+    <button type="button" id="four">4</button>
+    <button type="button" id="five">5</button>
+    <button type="button" id="six">6</button>
+    <button type="button" id="multiplication">*</button>
+    <br>
+    <button type="button" id="seven">7</button>
+    <button type="button" id="eight">8</button>
+    <button type="button" id="nine">9</button>
+    <button type="button" id="minus">-</button>
+    <br>
+    <button type="button" id="zero">0</button>
+    <button type="button" id="dot">.</button>
+    <button type="button" id="equals">=</button>
+    <button type="button" id="plus">+</button>
+  </div>
+  <div style="display:none;">
+    <hr>
+    <p style="color:red;" id="warning"></p>
+  </div>
+  <script>
+    /**
+     * Jag "fuskar" med id i JavaScript, för webbläsar-javascript laddar in
+     * varje id till en variabel som kan användas direkt istället för
+     * document.getElementById().
+     */
+
+    const operators = ["+", "-", "*", "/", "."];
+
+    // "plus, minus, multiplication, division, dot" är alla element i HTML.
+    const operatorsButtons = [plus, minus, multiplication, division, dot];
+    for (let index = 0; index < operatorsButtons.length; index++) {
+      const button = operatorsButtons[index];
+      button.onclick = checkForExistingOperatorOrAdd;
+    }
+
+    // "one, two, three, four, five, six, seven, eight, nine, zero" är alla element i HTML.
+    let numButtons = [one, two, three, four, five, six, seven, eight, nine, zero];
+    for (let index = 0; index < numButtons.length; index++) {
+      const button = numButtons[index];
+      button.onclick = addToInput;
+    }
+
+    equals.onclick = calculate;
+    reset.onclick = resetInput;
+
+    function checkForExistingOperatorOrAdd(ev) {
+      let existsOperatorAtEndOfLine = false;
+
+      // Loopa genom operators array.
+      for (let index = 0; index < operators.length; index++) {
+        const operator = operators[index];
+
+        if (input.value.endsWith(operator)) {
+          // Finns redan en operator på slutet av input strängen.
+          existsOperatorAtEndOfLine = true;
+          break; // Avbryt loop.
+        }
+      }
+
+      if (existsOperatorAtEndOfLine === false) {
+        addToInput(this.innerText);
+      } else {
+        // Byt ut tecknet
+        const arr = removeFromArrayByIndex(
+          input.value.split(""),
+          input.value.length - 1
+        );
+        input.value = arr.join("");
+        addToInput(this.innerText);
+      }
+    }
+
+    function addToInput(value) {
+      if (isString(value)) {
+        input.value += value
+      } else {
+        // Denna har blivit kallad av en event.
+        // Använd "this" för att ta reda på elementet som har kallat den.
+        input.value += this.innerText
+      }
+    }
+
+    function removeFromArrayByIndex(arr, index) {
+      arr.splice(index, 1);
+
+      return arr;
+    }
+
+    function calculate() {
+      // Trimma bort operatorer i början eller på slutet som bara hänger.
+      trimInput();
+
+      // Skapa en array med input.
+      let inputs = [];
+
+      // Loopa igenom input.value, jag behandlar strängen som om den vore en array.
+      for (let index = 0; index < input.value.length; index++) {
+        const str = input.value[index];
+        const lastInput = inputs[inputs.length - 1];
+
+        if (isNumber(str) || str === ".") {
+          if (isNumber(lastInput)) {
+            inputs[inputs.length - 1] = lastInput.concat(str);
+          } else {
+            inputs.push(str);
+          }
+        } else if (isNumber(str) === false && operators.includes(str) === false) {
+          /* "Infinity" handler.
+           * Man kan göra om strängen "Infinity" till värdet (number) Infinity,
+           * detta sker på rad 176 med Number("Infinity")
+           */
+          if (isString(lastInput)) {
+            inputs[inputs.length - 1] = lastInput.concat(str);
+          } else {
+            inputs.push(str);
+          }
+        } else {
+          inputs.push(str);
+        }
+      }
+
+      // Gör inputs till nummer om det är möjligt.
+      for (let index = 0; index < inputs.length; index++) {
+        const entry = inputs[index];
+
+        if (isNumber(entry)) {
+          inputs[index] = Number(entry);
+        }
+      }
+
+      /* Vi har nu en array som ser ut som följande:
+       * [1, "+", 1, "*", 2]
+       */
+
+      // PEMDAS
+
+      // Kalkylera 
+      inputs = calculateInPlaceByOperator(inputs, "/");
+      inputs = calculateInPlaceByOperator(inputs, "*");
+
+      console.log(inputs);
+
+      /* Vi har nu en array som ser ut som följande:
+       * [1, "+", 2]
+       */
+
+      let result = 0;
+      let operator = '+'; // Vi plussar alltid på första elementet.
+      for (let index = 0; index < inputs.length; index++) {
+        const entry = inputs[index];
+        let calc = result;
+
+        if (isString(entry)) {
+          // Definiera operator
+          operator = entry;
+        } else if (isNumber(entry)) {
+          // Subtraktion och addition kalkyleras här.
+          if (operator === "-") {
+            calc -= entry;
+          } else {
+            calc += entry;
+          }
+
+          if (calc === Infinity) {
+            pushErrorInfinity(result, operator, entry)
+          }
+
+          result = calc;
+        }
+      }
+
+      console.log(result);
+
+      input.value = result;
+    }
+
+    function calculateInPlaceByOperator(inputs, operator) {
+      // Rensa arrayen från undefineds
+      inputs = filterOutUndefineds(inputs)
+
+      for (let index = 0; index < inputs.length; index++) {
+        const entry = inputs[index];
+        const nextEntry = inputs[index + 1];
+        const priorEntry = inputs[index - 1];
+
+        if (isString(entry) === false) {
+          // Detta är inte en operator, gå framåt med nästa loop index.
+          continue;
+        }
+
+        if (entry !== operator) {
+          // Detta är inte operatorn vi letar efter, gå framåt med nästa loop index.
+          continue;
+        }
+
+        // Division och multiplikation beräknas här.
+        let calculatedValue;
+        if (operator === "/") {
+          calculatedValue = priorEntry / nextEntry;
+        } else if (operator === "*") {
+          calculatedValue = priorEntry * nextEntry;
+        }
+
+        if (isNumber(calculatedValue)) {
+          inputs[index - 1] = undefined;
+          inputs[index + 1] = undefined;
+          inputs[index] = calculatedValue;
+        } else if (isUndefined(calculatedValue) === false) {
+          inputs[index - 1] = undefined;
+          inputs[index + 1] = undefined;
+          inputs[index] = 0;
+          pushErrorReplacedWithZero(priorEntry, entry, nextEntry);
+        }
+
+        if (calculatedValue === Infinity) {
+          pushErrorInfinity(priorEntry, entry, nextEntry);
+        }
+
+        // Recursion power!
+        if (inputs.includes(entry)) {
+          return calculateInPlaceByOperator(inputs, entry);
+        }
+      }
+
+      return filterOutUndefineds(inputs);
+    }
+
+    function calculateInPlace(inputs, operator) {
+      for (let index = 0; index < inputs.length; index++) {
+        const entry = inputs[index];
+        const nextEntry = inputs[index + 1];
+        const priorEntry = inputs[index - 1];
+
+        if (isString(entry) === false) {
+          // Detta är inte en operator, gå framåt med nästa loop index.
+          continue;
+        }
+
+        if (entry !== operator) {
+          // Detta är inte operatorn vi letar efter, gå framåt med nästa loop index.
+          continue;
+        }
+
+        let calculatedValue;
+        if (entry === "+") {
+          calculatedValue = priorEntry + nextEntry;
+        } else if (entry === "-") {
+          calculatedValue = priorEntry - nextEntry;
+        } else if (entry === "*") {
+          calculatedValue = priorEntry * nextEntry;
+        } else if (entry === "/") {
+          calculatedValue = priorEntry / nextEntry;
+        }
+
+        if (isNumber(calculatedValue)) {
+          inputs[index - 1] = undefined;
+          inputs[index + 1] = undefined;
+          inputs[index] = calculatedValue;
+        } else if (isUndefined(calculatedValue) === false) {
+          inputs[index - 1] = undefined;
+          inputs[index + 1] = undefined;
+          inputs[index] = 0;
+          pushErrorReplacedWithZero(priorEntry, entry, nextEntry)
+        }
+
+        if (inputs.includes(entry)) {
+          // Recursion power!
+          return calculateInPlace(filterOutUndefineds(inputs), entry);
+        }
+      }
+
+      return filterOutUndefineds(inputs);
+    }
+
+    function trimInput() {
+      for (let index = 0; index < operators.length; index++) {
+        const operator = operators[index];
+
+        if (input.value.endsWith(operator)) {
+          const arr = removeFromArrayByIndex(
+            input.value.split(""),
+            input.value.length - 1
+          );
+          input.value = arr.join("");
+        }
+
+        if (input.value.startsWith(operator)) {
+          const arr = removeFromArrayByIndex(
+            input.value.split(""),
+            0
+          );
+          input.value = arr.join("");
+        }
+      }
+    }
+
+    function filterOutUndefineds(arr) {
+      return arr.filter((any) => isUndefined(any) === false);
+    }
+
+    function isNumber(val) {
+      // När man gör om undefined till ett nummer, blir den NaN, men det är inte vad vi är efter.
+      return isUndefined(val) ? false : isNaN(Number(val)) === false;
+    }
+
+    function isString(val) {
+      return typeof val === "string";
+    }
+
+    function isUndefined(val) {
+      return typeof val === "undefined";
+    }
+
+    function resetInput() {
+      resetWarning();
+      input.value = "";
+    }
+
+    // Extra
+    function pushErrorInfinity(priorEntry, entry, nextEntry) {
+      showWarning(
+        'Beräkningen  "' + priorEntry + entry + nextEntry +
+        ' har skapat Infinity. Resultatet kan inte stämma.'
+      );
+    }
+
+    function pushErrorReplacedWithZero(priorEntry, entry, nextEntry) {
+      showWarning(
+        'Beräkningen  "' + priorEntry + entry + nextEntry +
+        '" har skapat problem och har bytts ut med "0". Resultatet kan inte stämma.'
+      );
+    }
+
+    function showWarning(warn) {
+      warning.parentElement.style.display = "block";
+      warning.innerHTML += "<strong>VARNING!</strong> <span>" + warn + "</span><br>";
+    }
+
+    function resetWarning() {
+      warning.parentElement.style.display = "none";
+      warning.innerHTML = "";
+    }
+  </script>
+
+</body>
+
+</html>
